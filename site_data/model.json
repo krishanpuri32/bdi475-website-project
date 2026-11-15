@@ -1,0 +1,237 @@
+{
+  "description": "OLS on log(sale_price). estimate = exp(sum of coefficient * feature).",
+  "source": "data/college_town_home_sales.csv, fitted by scripts/build_model.py",
+  "features": {
+    "log_sqft": "natural log of living_area_sqft",
+    "age": "sale year minus year_built (the page uses the reference date's year)",
+    "age_sq": "age squared",
+    "years_since_first_sale": "(sale_date - first_sale_date) in days / 365.25",
+    "city=<name>": "1 if that city, else 0; Ann Arbor is the base city"
+  },
+  "coefficients": {
+    "intercept": 7.66756141955837,
+    "log_sqft": 0.7237361004684983,
+    "beds": -0.012938235233119669,
+    "baths": 0.08073320890788498,
+    "age": -0.00570164298438136,
+    "age_sq": 4.9748326111935245e-05,
+    "miles_to_campus": -0.023067132263996964,
+    "years_since_first_sale": 0.03147400458064019,
+    "city=Athens": -0.302217333508834,
+    "city=Carrboro": 0.10940007773970077,
+    "city=Champaign": -0.6677214891501999,
+    "city=Chapel Hill": 0.08066211910011183,
+    "city=Charlottesville": 0.03719771140710802,
+    "city=Davis": 0.5942508017149694,
+    "city=Gainesville": -0.314325164931216,
+    "city=Iowa City": -0.45441421864973247,
+    "city=Lafayette": -0.5509123364648275,
+    "city=Madison": -0.02827436824626263,
+    "city=Middleton": 0.03488003458346534,
+    "city=Newberry": -0.2800400834448795,
+    "city=Pittsboro": 0.22810574526911637,
+    "city=Savoy": -0.4292506980267484,
+    "city=State College": -0.26624769205643,
+    "city=Urbana": -0.7039476409300972,
+    "city=West Lafayette": -0.42958106780902455
+  },
+  "base_city": "Ann Arbor",
+  "first_sale_date": "2023-03-27",
+  "reference_date": "2026-03-25",
+  "reference_years_since_first_sale": 2.9952087611225187,
+  "cities": [
+    {
+      "city": "Ann Arbor",
+      "state": "MI",
+      "rows": 2971,
+      "median_miles_to_campus": 2.7
+    },
+    {
+      "city": "Athens",
+      "state": "GA",
+      "rows": 2333,
+      "median_miles_to_campus": 3.8
+    },
+    {
+      "city": "Carrboro",
+      "state": "NC",
+      "rows": 203,
+      "median_miles_to_campus": 1.9
+    },
+    {
+      "city": "Champaign",
+      "state": "IL",
+      "rows": 2270,
+      "median_miles_to_campus": 3.0
+    },
+    {
+      "city": "Chapel Hill",
+      "state": "NC",
+      "rows": 2673,
+      "median_miles_to_campus": 3.9
+    },
+    {
+      "city": "Charlottesville",
+      "state": "VA",
+      "rows": 2736,
+      "median_miles_to_campus": 3.4
+    },
+    {
+      "city": "Davis",
+      "state": "CA",
+      "rows": 940,
+      "median_miles_to_campus": 2.0
+    },
+    {
+      "city": "Gainesville",
+      "state": "FL",
+      "rows": 5452,
+      "median_miles_to_campus": 4.3
+    },
+    {
+      "city": "Iowa City",
+      "state": "IA",
+      "rows": 1901,
+      "median_miles_to_campus": 2.2
+    },
+    {
+      "city": "Lafayette",
+      "state": "IN",
+      "rows": 3049,
+      "median_miles_to_campus": 4.1
+    },
+    {
+      "city": "Madison",
+      "state": "WI",
+      "rows": 5038,
+      "median_miles_to_campus": 4.6
+    },
+    {
+      "city": "Middleton",
+      "state": "WI",
+      "rows": 644,
+      "median_miles_to_campus": 5.7
+    },
+    {
+      "city": "Newberry",
+      "state": "FL",
+      "rows": 152,
+      "median_miles_to_campus": 8.6
+    },
+    {
+      "city": "Pittsboro",
+      "state": "NC",
+      "rows": 86,
+      "median_miles_to_campus": 8.0
+    },
+    {
+      "city": "Savoy",
+      "state": "IL",
+      "rows": 247,
+      "median_miles_to_campus": 3.8
+    },
+    {
+      "city": "State College",
+      "state": "PA",
+      "rows": 1340,
+      "median_miles_to_campus": 2.1
+    },
+    {
+      "city": "Urbana",
+      "state": "IL",
+      "rows": 1123,
+      "median_miles_to_campus": 2.2
+    },
+    {
+      "city": "West Lafayette",
+      "state": "IN",
+      "rows": 1554,
+      "median_miles_to_campus": 3.4
+    }
+  ],
+  "input_ranges": {
+    "living_area_sqft": {
+      "min": 336.0,
+      "max": 8000.0,
+      "p01": 724.0,
+      "p99": 5513.449999999997,
+      "median": 1920.0
+    },
+    "beds": {
+      "min": 1.0,
+      "max": 7.0,
+      "p01": 2.0,
+      "p99": 6.0,
+      "median": 3.0
+    },
+    "baths": {
+      "min": 1.0,
+      "max": 7.0,
+      "p01": 1.0,
+      "p99": 6.0,
+      "median": 2.0
+    },
+    "year_built": {
+      "min": 1900.0,
+      "max": 2026.0,
+      "p01": 1904.0,
+      "p99": 2025.0,
+      "median": 1983.0
+    },
+    "miles_to_campus": {
+      "min": 0.2,
+      "max": 15.1,
+      "p01": 0.6,
+      "p99": 9.6,
+      "median": 3.4
+    }
+  },
+  "rows": {
+    "total": 35442,
+    "kept": 34712,
+    "dropped_by_rule": [
+      {
+        "rule": "sale_date present",
+        "rows_removed": 6
+      },
+      {
+        "rule": "year_built present",
+        "rows_removed": 1
+      },
+      {
+        "rule": "sale_price 10,000 to 5,000,000",
+        "rows_removed": 71
+      },
+      {
+        "rule": "living_area_sqft 300 to 8,000",
+        "rows_removed": 562
+      },
+      {
+        "rule": "beds 1 to 7",
+        "rows_removed": 35
+      },
+      {
+        "rule": "baths 1 to 7",
+        "rows_removed": 55
+      }
+    ],
+    "train": 27783,
+    "test": 6929,
+    "seed": 475
+  },
+  "holdout": {
+    "r_squared_log": 0.7287145133888928,
+    "median_abs_pct_error": 0.14930463183833576,
+    "share_within_10pct": 0.34680329051811226,
+    "share_within_20pct": 0.6270746139414057,
+    "error_quantiles": {
+      "p5": -0.3543937687495066,
+      "p10": -0.25801388505522915,
+      "p25": -0.1318788139526731,
+      "p50": 0.01117986065051424,
+      "p75": 0.16907770813429424,
+      "p90": 0.3619645711223406,
+      "p95": 0.5330489140457885
+    }
+  }
+}

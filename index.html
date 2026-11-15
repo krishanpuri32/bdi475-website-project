@@ -1,31 +1,145 @@
 <!DOCTYPE html>
-<!-- A placeholder from the Home Sales template. Replace this file with your site's first page. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Under construction</title>
-  <!-- An empty icon, so the browser doesn't log an error looking for favicon.ico -->
+  <title>College-town home price estimator</title>
   <link rel="icon" href="data:,">
   <style>
     :root { color-scheme: light dark; }
     body {
       max-width: 40rem;
       margin: 0 auto;
-      padding: 3rem 1rem;
+      padding: 2rem 1rem;
       font-family: system-ui, sans-serif;
       line-height: 1.5;
     }
+    form { display: grid; grid-template-columns: max-content 1fr; gap: 0.6rem 1rem; align-items: center; }
+    form button { grid-column: 1 / -1; justify-self: start; padding: 0.4rem 1.2rem; font-size: 1rem; }
+    input, select { font-size: 1rem; padding: 0.25rem; max-width: 14rem; }
+    #result { margin-top: 1.5rem; padding: 1rem; border: 1px solid #8884; border-radius: 6px; }
+    #estimate { font-size: 2rem; font-weight: 600; margin: 0.25rem 0; }
+    .note { font-size: 0.9rem; opacity: 0.8; }
     footer { margin-top: 3rem; font-size: 0.875rem; opacity: 0.75; }
   </style>
 </head>
 <body>
   <main>
-    <h1>This site is under construction</h1>
-    <p>It will show findings from the College-town home sales dataset.</p>
+    <h1>College-town home price estimator</h1>
+    <p>Pick a city and describe a home. The estimate comes from a model fitted to
+      <span id="rows-kept">…</span> home sales in 18 college towns, valued as of
+      <span id="ref-date">…</span>, the last sale in the data.</p>
+
+    <form id="form">
+      <label for="city">City</label>
+      <select id="city" required></select>
+
+      <label for="sqft">Living area (sq ft)</label>
+      <input id="sqft" type="number" required step="1" value="1800">
+
+      <label for="beds">Bedrooms</label>
+      <input id="beds" type="number" required step="1" value="3">
+
+      <label for="baths">Bathrooms</label>
+      <input id="baths" type="number" required step="0.5" value="2">
+
+      <label for="year">Year built</label>
+      <input id="year" type="number" required step="1" value="1990">
+
+      <label for="miles">Miles to campus</label>
+      <input id="miles" type="number" required step="0.1">
+
+      <button type="submit">Estimate</button>
+    </form>
+
+    <section id="result" hidden>
+      <div>Estimated sale price as of <span class="ref-month"></span></div>
+      <div id="estimate"></div>
+      <div class="note" id="accuracy"></div>
+    </section>
+
+    <p class="note" id="method"></p>
+    <p class="note" id="error" hidden></p>
   </main>
   <footer>
     <p>Data: College-town home sales dataset, version 1.0 (2026). University of Illinois-Deloitte Foundation Center for Business Emerging Technologies. Data collected March 2026.</p>
   </footer>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const pct = (x) => (x * 100).toFixed(1) + "%";
+    const usd = (x) => "$" + Math.round(x).toLocaleString("en-US");
+
+    fetch("site_data/model.json")
+      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(start)
+      .catch((e) => { $("error").hidden = false; $("error").textContent = "Could not load the model: " + e.message; });
+
+    function start(m) {
+      const ref = new Date(m.reference_date + "T00:00:00");
+      const refMonth = ref.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      $("rows-kept").textContent = m.rows.kept.toLocaleString("en-US");
+      $("ref-date").textContent = refMonth;
+      document.querySelectorAll(".ref-month").forEach((el) => (el.textContent = refMonth));
+
+      // Inputs are limited to the smallest and largest values among the rows the model was fitted on.
+      const lim = m.input_ranges;
+      for (const [id, col] of [["sqft", "living_area_sqft"], ["beds", "beds"], ["baths", "baths"],
+                               ["year", "year_built"], ["miles", "miles_to_campus"]]) {
+        $(id).min = lim[col].min;
+        $(id).max = lim[col].max;
+      }
+
+      const sel = $("city");
+      for (const c of m.cities) {
+        const o = document.createElement("option");
+        o.value = c.city;
+        o.textContent = c.city + ", " + c.state;
+        sel.appendChild(o);
+      }
+      const setMiles = () => {
+        const c = m.cities.find((c) => c.city === sel.value);
+        $("miles").value = c.median_miles_to_campus;
+      };
+      sel.addEventListener("change", setMiles);
+      setMiles();
+
+      const h = m.holdout;
+      $("accuracy").textContent =
+        "On " + m.rows.test.toLocaleString("en-US") + " sales held back from fitting, half of the estimates were within " +
+        pct(h.median_abs_pct_error) + " of the actual price, and " + pct(h.share_within_20pct) + " were within 20%.";
+      $("method").textContent =
+        "How it works: ordinary least squares on the log of sale price, using living area, bedrooms, bathrooms, " +
+        "age, miles to campus, a time trend and the city. Fitted on " + m.rows.train.toLocaleString("en-US") +
+        " sales from " + m.first_sale_date + " to " + m.reference_date + ". Sales were kept if the price was $10,000 to " +
+        "$5,000,000, living area 300 to 8,000 sq ft, 1 to 7 bedrooms and bathrooms, with a sale date and year built; " +
+        (m.rows.total - m.rows.kept).toLocaleString("en-US") + " of " + m.rows.total.toLocaleString("en-US") + " sales were left out.";
+
+      $("form").addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        $("result").hidden = false;
+        $("estimate").textContent = usd(estimate(m, {
+          city: sel.value,
+          sqft: +$("sqft").value, beds: +$("beds").value, baths: +$("baths").value,
+          year: +$("year").value, miles: +$("miles").value,
+        }));
+      });
+    }
+
+    function estimate(m, x) {
+      const b = m.coefficients;
+      const age = new Date(m.reference_date + "T00:00:00").getFullYear() - x.year;
+      let z = b.intercept
+        + b.log_sqft * Math.log(x.sqft)
+        + b.beds * x.beds
+        + b.baths * x.baths
+        + b.age * age
+        + b.age_sq * age * age
+        + b.miles_to_campus * x.miles
+        + b.years_since_first_sale * m.reference_years_since_first_sale;
+      if (x.city !== m.base_city) z += b["city=" + x.city];
+      return Math.exp(z);
+    }
+  </script>
 </body>
 </html>
