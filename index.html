@@ -143,13 +143,16 @@
           year: +$("year").value, miles: +$("miles").value,
         };
         const est = estimate(m, x);
-        const q = m.holdout.error_quantiles;
+        // The city's own band where it has enough held-out sales, the pooled band otherwise.
+        const cb = m.holdout.city_bands[x.city];
         $("result").hidden = false;
         $("estimate").textContent = usd(est);
-        $("range").textContent = usd(est * (1 + q.p10)) + " to " + usd(est * (1 + q.p90));
-        $("range-note").textContent =
-          "Among " + num(m.rows.test) + " sales held back from fitting the model, 8 in 10 sold for between " +
-          pct0(1 + q.p10) + " and " + pct0(1 + q.p90) + " of their estimate. This range applies the same band to this estimate.";
+        $("range").textContent = usd(est * (1 + cb.p10)) + " to " + usd(est * (1 + cb.p90));
+        $("range-note").textContent = (cb.band === "city"
+          ? "Among " + num(cb.test_rows) + " " + x.city + " sales held back from fitting the model, 8 in 10 sold for between "
+          : x.city + " has only " + num(cb.test_rows) + " held-back sales, fewer than " + m.holdout.min_test_rows_for_city_band +
+            ", so this uses the band for all " + num(m.rows.test) + " held-back sales: 8 in 10 sold for between ") +
+          pct0(1 + cb.p10) + " and " + pct0(1 + cb.p90) + " of their estimate. This range applies that band to this estimate.";
         showComps(x);
       });
     }
@@ -207,6 +210,10 @@
         "beds 1 to 7": "bedrooms missing, or under 1 or over 7",
         "baths 1 to 7": "bathrooms missing, or under 1 or over 7",
       };
+      const own = Object.entries(h.city_bands).filter(([, b]) => b.band === "city")
+        .sort((a, b) => a[1].median_abs_pct_error - b[1].median_abs_pct_error);
+      const lo = own[0], hi = own[own.length - 1];
+      const pooled = Object.entries(h.city_bands).filter(([, b]) => b.band === "pooled").map(([c]) => c);
       const dropped = m.rows.dropped_by_rule
         .map((r) => "<li>" + (labels[r.rule] || r.rule) + ": " + num(r.rows_removed) + "</li>").join("");
       $("how-body").innerHTML =
@@ -217,6 +224,11 @@
         "<p><strong>How wrong it can be.</strong> On those " + num(m.rows.test) + " test sales, the actual price was within " +
         pct(h.median_abs_pct_error) + " of the estimate for half of them, and within 20% of the estimate for " +
         pct(h.share_within_20pct) + ". The other " + pct(1 - h.share_within_20pct) + " sold for more than 20% above or below their estimate.</p>" +
+        "<p><strong>It is more accurate in some cities than others.</strong> Among cities with at least " +
+        h.min_test_rows_for_city_band + " held-back sales, the median error ran from " + pct(lo[1].median_abs_pct_error) +
+        " in " + lo[0] + " to " + pct(hi[1].median_abs_pct_error) + " in " + hi[0] + ". So the likely range uses the " +
+        "city's own held-back sales where it has at least " + h.min_test_rows_for_city_band + " of them, and all " +
+        num(m.rows.test) + " held-back sales otherwise, which applies to " + pooled.join(", ") + ".</p>" +
         "<p><strong>As of " + refMonth + ", not today.</strong> The estimate is for a sale on " + m.reference_date +
         ", the last sale in the data. Prices since then are not in it.</p>" +
         "<p><strong>What it cannot see.</strong> The condition of the home, renovations, the lot, the view, and which " +
