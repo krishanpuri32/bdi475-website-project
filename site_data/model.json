@@ -217,7 +217,25 @@
     ],
     "train": 27783,
     "test": 6929,
-    "seed": 475
+    "seed": 475,
+    "living_area_rule_detail": {
+      "at_rule": {
+        "missing": 373,
+        "zero": 127,
+        "1_to_299": 3,
+        "over_8000": 59
+      },
+      "whole_file": {
+        "missing": 376,
+        "zero": 127,
+        "1_to_299": 3,
+        "over_8000": 70
+      }
+    },
+    "negative_age": {
+      "kept_rows": 42,
+      "whole_file": 46
+    }
   },
   "holdout": {
     "r_squared_log": 0.7287145133888928,

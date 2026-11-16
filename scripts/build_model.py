@@ -46,6 +46,21 @@ for name, ok in rules:
 d = df[keep].copy()
 rows_kept = len(d)
 
+# Detail for the data notes: what the living-area rule removed, counted at the rule
+# (rows that passed the earlier rules) and in the whole file.
+before_sqft = rules[0][1] & rules[1][1] & rules[2][1]
+sqft = df["living_area_sqft"]
+sqft_parts = {"missing": sqft.isna(), "zero": sqft == 0,
+              "1_to_299": (sqft > 0) & (sqft < 300), "over_8000": sqft > 8000}
+sqft_detail = {
+    "at_rule": {k: int((before_sqft & v).sum()) for k, v in sqft_parts.items()},
+    "whole_file": {k: int(v.sum()) for k, v in sqft_parts.items()},
+}
+neg_age = {
+    "kept_rows": int(((d["sale_date"].dt.year - d["year_built"]) < 0).sum()),
+    "whole_file": int(((df["sale_date"].dt.year - df["year_built"]) < 0).sum()),
+}
+
 first_sale = d["sale_date"].min()
 last_sale = d["sale_date"].max()
 cities = sorted(d["city"].unique())
@@ -134,7 +149,9 @@ model = {
                      ["living_area_sqft", "beds", "baths", "year_built", "miles_to_campus"]},
     "rows": {"total": rows_total, "kept": rows_kept, "dropped_by_rule": dropped,
              "train": int((~is_test).sum()), "test": int(is_test.sum()),
-             "seed": SEED},
+             "seed": SEED,
+             "living_area_rule_detail": sqft_detail,
+             "negative_age": neg_age},
     "holdout": {
         "r_squared_log": float(r2),
         "median_abs_pct_error": float(np.median(abs_pct)),
@@ -148,6 +165,26 @@ model = {
 
 OUT.parent.mkdir(exist_ok=True)
 OUT.write_text(json.dumps(model, indent=2) + "\n")
+
+# Comparable sales: the same kept rows, as parallel arrays per city. No addresses or ids.
+# Prices are as sold, on their own dates.
+comps = {"columns": ["sale_date", "sale_price", "living_area_sqft", "beds", "baths",
+                     "year_built", "miles_to_campus"],
+         "source": "kept rows of data/college_town_home_sales.csv, by scripts/build_model.py",
+         "cities": {}}
+for c in cities:
+    g = d[d["city"] == c].sort_values(["sale_date", "listing_id"], ascending=[False, True])
+    comps["cities"][c] = [
+        g["sale_date"].dt.strftime("%Y-%m-%d").tolist(),
+        g["sale_price"].astype(int).tolist(),
+        g["living_area_sqft"].astype(int).tolist(),
+        g["beds"].astype(int).tolist(),
+        [float(b) if b % 1 else int(b) for b in g["baths"]],
+        g["year_built"].astype(int).tolist(),
+        [float(m) for m in g["miles_to_campus"]],
+    ]
+COMPS = ROOT / "site_data" / "comps.json"
+COMPS.write_text(json.dumps(comps, separators=(",", ":")) + "\n")
 
 # Printed report
 print(f"Rows in file: {rows_total:,}")
@@ -163,4 +200,8 @@ print(f"Elasticity on living area: {coef['log_sqft']:.3f}")
 print(f"Time trend per year: {np.exp(coef['years_since_first_sale']) - 1:+.2%}")
 print(f"Beds coefficient: {coef['beds']:+.4f}   baths: {coef['baths']:+.4f}")
 print(f"Miles to campus coefficient: {coef['miles_to_campus']:+.4f}")
+print(f"Living-area rule detail: {sqft_detail}")
+print(f"Negative age (sale year before year built): {neg_age}")
 print(f"Wrote {OUT.relative_to(ROOT)}")
+print(f"Wrote {COMPS.relative_to(ROOT)} ({COMPS.stat().st_size:,} bytes, "
+      f"{sum(len(v[0]) for v in comps['cities'].values()):,} sales)")
