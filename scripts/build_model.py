@@ -111,6 +111,23 @@ av_med = float(np.median(np.abs(np.exp(y[m_te] - Xav[m_te] @ b_av) - 1)))
 
 coef = dict(zip(FEATURES, (float(b) for b in beta)))
 
+# Per-city range: p10 and p90 of (actual / estimate - 1) on the city's held-out sales,
+# where the city has at least MIN_CITY_TEST of them; the pooled band otherwise.
+MIN_CITY_TEST = 100
+test_city = d["city"].to_numpy()[is_test]
+pooled_p10, pooled_p90 = (float(np.quantile(ratio_err, q)) for q in (0.10, 0.90))
+city_bands = {}
+for c in sorted(d["city"].unique()):
+    e = ratio_err[test_city == c]
+    own = len(e) >= MIN_CITY_TEST
+    city_bands[c] = {
+        "test_rows": int(len(e)),
+        "median_abs_pct_error": float(np.median(np.abs(e))),
+        "band": "city" if own else "pooled",
+        "p10": float(np.quantile(e, 0.10)) if own else pooled_p10,
+        "p90": float(np.quantile(e, 0.90)) if own else pooled_p90,
+    }
+
 city_info = []
 for c in cities:
     g = d[d["city"] == c]
@@ -160,6 +177,8 @@ model = {
         # actual / estimate - 1, for the range in session 2
         "error_quantiles": {f"p{q}": float(np.quantile(ratio_err, q / 100))
                             for q in (5, 10, 25, 50, 75, 90, 95)},
+        "min_test_rows_for_city_band": MIN_CITY_TEST,
+        "city_bands": city_bands,
     },
 }
 
@@ -200,6 +219,13 @@ print(f"Elasticity on living area: {coef['log_sqft']:.3f}")
 print(f"Time trend per year: {np.exp(coef['years_since_first_sale']) - 1:+.2%}")
 print(f"Beds coefficient: {coef['beds']:+.4f}   baths: {coef['baths']:+.4f}")
 print(f"Miles to campus coefficient: {coef['miles_to_campus']:+.4f}")
+print(f"Range band by city (actual / estimate, held-out; pooled if under {MIN_CITY_TEST} test sales):")
+print(f"  {'city':<16}{'test':>6}{'median err':>12}{'band':>8}{'p10':>8}{'p90':>8}")
+for c, b in city_bands.items():
+    print(f"  {c:<16}{b['test_rows']:>6}{b['median_abs_pct_error']:>12.1%}{b['band']:>8}"
+          f"{1 + b['p10']:>8.0%}{1 + b['p90']:>8.0%}")
+print(f"  {'pooled':<16}{len(ratio_err):>6}{np.median(abs_pct):>12.1%}{'':>8}"
+      f"{1 + pooled_p10:>8.0%}{1 + pooled_p90:>8.0%}")
 print(f"Living-area rule detail: {sqft_detail}")
 print(f"Negative age (sale year before year built): {neg_age}")
 print(f"Wrote {OUT.relative_to(ROOT)}")
