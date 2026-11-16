@@ -1,3 +1,5 @@
+> Note: this is the plan as written before the build. `DECISIONS.md` records what changed.
+
 # Build plan: college-town home price estimator
 
 Written in the planning session on 2026-11-15. This is the handoff for Claude Code. Read it with

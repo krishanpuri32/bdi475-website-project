@@ -8,7 +8,8 @@ Rules:
 - The data is in data/college_town_home_sales.csv. Read docs/data_description_sheet.md before writing any analysis code, and follow its warnings. Read zipcode, county_fips and parcel_number as text.
 - The same data is also in data/ as Excel, SQLite, DuckDB and Parquet files. Never edit any of the five dataset files (data/college_town_home_sales.*). Save any file made from them under a new name, and put the script that makes it in scripts/.
 - Never invent or estimate numbers. Compute every number on the site from the data.
-- Work in small steps. Before a large change, describe your plan and wait for my approval.
+- The site's data files are made by scripts/build_model.py and live in site_data/. Rerun the script rather than editing them.
+- Work in small steps.
 - After each change, tell me what you changed and how I can check it in my browser, on the live site or in the pull request. I don't install tools, run code or start a local server on my own computer, so don't ask me to.
 - Never put passwords, API keys or other secrets in any file.
 - .github/workflows/pages.yml publishes the repository's files to GitHub Pages, as they are, each time main is pushed. Only add a build step to it if we move to a framework that needs one.
