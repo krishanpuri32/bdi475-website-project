@@ -19,6 +19,10 @@
     input, select { font-size: 1rem; padding: 0.25rem; max-width: 14rem; }
     #result { margin-top: 1.5rem; padding: 1rem; border: 1px solid #8884; border-radius: 6px; }
     #estimate { font-size: 2rem; font-weight: 600; margin: 0.25rem 0; }
+    #range { font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+    th, td { padding: 0.25rem 0.5rem; text-align: right; border-bottom: 1px solid #8884; }
+    th:first-child, td:first-child { text-align: left; }
     .note { font-size: 0.9rem; opacity: 0.8; }
     footer { margin-top: 3rem; font-size: 0.875rem; opacity: 0.75; }
   </style>
@@ -28,7 +32,7 @@
     <h1>College-town home price estimator</h1>
     <p>Pick a city and describe a home. The estimate comes from a model fitted to
       <span id="rows-kept">…</span> home sales in 18 college towns, valued as of
-      <span id="ref-date">…</span>, the last sale in the data.</p>
+      <span class="ref-month">…</span>, the last sale in the data.</p>
 
     <form id="form">
       <label for="city">City</label>
@@ -51,14 +55,26 @@
 
       <button type="submit">Estimate</button>
     </form>
+    <p class="note" id="limits"></p>
 
     <section id="result" hidden>
       <div>Estimated sale price as of <span class="ref-month"></span></div>
       <div id="estimate"></div>
-      <div class="note" id="accuracy"></div>
+      <div>Likely range: <span id="range"></span></div>
+      <p class="note" id="range-note"></p>
     </section>
 
-    <p class="note" id="method"></p>
+    <section id="comps" hidden>
+      <h2>Most similar homes that sold in <span id="comps-city"></span></h2>
+      <p class="note" id="comps-note"></p>
+      <div id="comps-body"></div>
+    </section>
+
+    <section id="how">
+      <h2>How this works, and how wrong it can be</h2>
+      <div id="how-body"><p class="note">Loading…</p></div>
+    </section>
+
     <p class="note" id="error" hidden></p>
   </main>
   <footer>
@@ -68,7 +84,16 @@
   <script>
     const $ = (id) => document.getElementById(id);
     const pct = (x) => (x * 100).toFixed(1) + "%";
+    const pct0 = (x) => Math.round(x * 100) + "%";
     const usd = (x) => "$" + Math.round(x).toLocaleString("en-US");
+    const num = (x) => x.toLocaleString("en-US");
+    const monthYear = (iso) =>
+      new Date(iso + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" });
+
+    // comps.json loads on its own. If it fails, the estimate still works.
+    const compsPromise = fetch("site_data/comps.json")
+      .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+    compsPromise.catch(() => {});
 
     fetch("site_data/model.json")
       .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
@@ -76,19 +101,23 @@
       .catch((e) => { $("error").hidden = false; $("error").textContent = "Could not load the model: " + e.message; });
 
     function start(m) {
-      const ref = new Date(m.reference_date + "T00:00:00");
-      const refMonth = ref.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-      $("rows-kept").textContent = m.rows.kept.toLocaleString("en-US");
-      $("ref-date").textContent = refMonth;
+      const refMonth = new Date(m.reference_date + "T00:00:00")
+        .toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      $("rows-kept").textContent = num(m.rows.kept);
       document.querySelectorAll(".ref-month").forEach((el) => (el.textContent = refMonth));
 
       // Inputs are limited to the smallest and largest values among the rows the model was fitted on.
       const lim = m.input_ranges;
-      for (const [id, col] of [["sqft", "living_area_sqft"], ["beds", "beds"], ["baths", "baths"],
-                               ["year", "year_built"], ["miles", "miles_to_campus"]]) {
+      const fields = [["sqft", "living_area_sqft", "living area", " sq ft"], ["beds", "beds", "bedrooms", ""],
+                      ["baths", "baths", "bathrooms", ""], ["year", "year_built", "year built", ""],
+                      ["miles", "miles_to_campus", "miles to campus", ""]];
+      for (const [id, col] of fields) {
         $(id).min = lim[col].min;
         $(id).max = lim[col].max;
       }
+      $("limits").textContent = "Accepted values are the range of the sales the model was fitted on: " +
+        fields.map(([, col, label, unit]) => { const f = col === "year_built" ? String : num;
+          return label + " " + f(lim[col].min) + " to " + f(lim[col].max) + unit; }).join("; ") + ".";
 
       const sel = $("city");
       for (const c of m.cities) {
@@ -104,25 +133,24 @@
       sel.addEventListener("change", setMiles);
       setMiles();
 
-      const h = m.holdout;
-      $("accuracy").textContent =
-        "On " + m.rows.test.toLocaleString("en-US") + " sales held back from fitting, half of the estimates were within " +
-        pct(h.median_abs_pct_error) + " of the actual price, and " + pct(h.share_within_20pct) + " were within 20%.";
-      $("method").textContent =
-        "How it works: ordinary least squares on the log of sale price, using living area, bedrooms, bathrooms, " +
-        "age, miles to campus, a time trend and the city. Fitted on " + m.rows.train.toLocaleString("en-US") +
-        " sales from " + m.first_sale_date + " to " + m.reference_date + ". Sales were kept if the price was $10,000 to " +
-        "$5,000,000, living area 300 to 8,000 sq ft, 1 to 7 bedrooms and bathrooms, with a sale date and year built; " +
-        (m.rows.total - m.rows.kept).toLocaleString("en-US") + " of " + m.rows.total.toLocaleString("en-US") + " sales were left out.";
+      renderHow(m, refMonth);
 
       $("form").addEventListener("submit", (ev) => {
         ev.preventDefault();
-        $("result").hidden = false;
-        $("estimate").textContent = usd(estimate(m, {
+        const x = {
           city: sel.value,
           sqft: +$("sqft").value, beds: +$("beds").value, baths: +$("baths").value,
           year: +$("year").value, miles: +$("miles").value,
-        }));
+        };
+        const est = estimate(m, x);
+        const q = m.holdout.error_quantiles;
+        $("result").hidden = false;
+        $("estimate").textContent = usd(est);
+        $("range").textContent = usd(est * (1 + q.p10)) + " to " + usd(est * (1 + q.p90));
+        $("range-note").textContent =
+          "Among " + num(m.rows.test) + " sales held back from fitting the model, 8 in 10 sold for between " +
+          pct0(1 + q.p10) + " and " + pct0(1 + q.p90) + " of their estimate. This range applies the same band to this estimate.";
+        showComps(x);
       });
     }
 
@@ -139,6 +167,64 @@
         + b.years_since_first_sale * m.reference_years_since_first_sale;
       if (x.city !== m.base_city) z += b["city=" + x.city];
       return Math.exp(z);
+    }
+
+    // Lower score = more similar. Rows are stored newest first, so a stable sort breaks ties toward recent sales.
+    function similarity(x, sqft, beds, baths, year) {
+      return Math.abs(Math.log(sqft / x.sqft)) / 0.25 + 0.5 * Math.abs(beds - x.beds) +
+             0.5 * Math.abs(baths - x.baths) + Math.abs(year - x.year) / 20;
+    }
+
+    function showComps(x) {
+      $("comps").hidden = false;
+      $("comps-city").textContent = x.city;
+      compsPromise.then((c) => {
+        const [date, price, sqft, beds, baths, year] = c.cities[x.city];
+        const idx = date.map((_, i) => i);
+        const score = idx.map((i) => similarity(x, sqft[i], beds[i], baths[i], year[i]));
+        idx.sort((a, b) => score[a] - score[b]);
+        const top = idx.slice(0, 6);
+        $("comps-note").textContent = "The six sales in this city whose size, bedrooms, bathrooms and age are closest " +
+          "to what you entered, out of " + num(date.length) + ". Prices are as sold on the date shown, not adjusted to " +
+          document.querySelector(".ref-month").textContent + ".";
+        const rows = top.map((i) => "<tr><td>" + monthYear(date[i]) + "</td><td>" + usd(price[i]) + "</td><td>" +
+          num(sqft[i]) + "</td><td>" + beds[i] + "</td><td>" + baths[i] + "</td><td>" + year[i] + "</td></tr>").join("");
+        $("comps-body").innerHTML = "<table><thead><tr><th>Sold</th><th>Price</th><th>Sq ft</th><th>Beds</th>" +
+          "<th>Baths</th><th>Built</th></tr></thead><tbody>" + rows + "</tbody></table>";
+      }).catch(() => {
+        $("comps-note").textContent = "";
+        $("comps-body").innerHTML = "<p class=\"note\">The list of similar sales could not be loaded. The estimate above is not affected.</p>";
+      });
+    }
+
+    function renderHow(m, refMonth) {
+      const h = m.holdout;
+      const labels = {
+        "sale_date present": "no sale date",
+        "year_built present": "no year built",
+        "sale_price 10,000 to 5,000,000": "price under $10,000 or over $5,000,000",
+        "living_area_sqft 300 to 8,000": "living area missing, or under 300 or over 8,000 sq ft",
+        "beds 1 to 7": "bedrooms missing, or under 1 or over 7",
+        "baths 1 to 7": "bathrooms missing, or under 1 or over 7",
+      };
+      const dropped = m.rows.dropped_by_rule
+        .map((r) => "<li>" + (labels[r.rule] || r.rule) + ": " + num(r.rows_removed) + "</li>").join("");
+      $("how-body").innerHTML =
+        "<p>The model is an ordinary least squares regression on the log of sale price. It uses living area, bedrooms, " +
+        "bathrooms, age, miles to campus, the city, and a time trend across sales from " + m.first_sale_date +
+        " to " + m.reference_date + ". It was fitted on " + num(m.rows.train) + " sales and tested on " +
+        num(m.rows.test) + " others it never saw.</p>" +
+        "<p><strong>How wrong it can be.</strong> On those " + num(m.rows.test) + " test sales, the actual price was within " +
+        pct(h.median_abs_pct_error) + " of the estimate for half of them, and within 20% of the estimate for " +
+        pct(h.share_within_20pct) + ". The other " + pct(1 - h.share_within_20pct) + " sold for more than 20% above or below their estimate.</p>" +
+        "<p><strong>As of " + refMonth + ", not today.</strong> The estimate is for a sale on " + m.reference_date +
+        ", the last sale in the data. Prices since then are not in it.</p>" +
+        "<p><strong>What it cannot see.</strong> The condition of the home, renovations, the lot, the view, and which " +
+        "part of the city it is in, beyond its distance to campus. Two homes that match on every field above can sell " +
+        "for very different prices.</p>" +
+        "<p><strong>Sales left out.</strong> " + num(m.rows.total - m.rows.kept) + " of " + num(m.rows.total) +
+        " sales were not used, mostly because of impossible or missing values. Rules applied in order, with the sales " +
+        "each one removed:</p><ul>" + dropped + "</ul>";
     }
   </script>
 </body>
