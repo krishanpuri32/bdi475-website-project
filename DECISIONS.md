@@ -31,7 +31,7 @@ How the site was built, what we corrected along the way, and what the data showe
 | The range wording changed from "8 in 10 similar sales closed between X and Y" to "8 in 10 held-back sales sold for between 74% and 136% of their estimate" | Code pointed out that the held-out errors measure all test sales, not "similar" sales |
 | The input-limit line read "year built 1,900 to 2,026" | Code's own mistake (a shared number formatter), caught reading the browser test output before commit |
 | A draft said "roughly 1 in 3 homes" sell for more than 20% off | Code replaced the rounded figure with the computed 37.3% |
-| `AGENTS.md` and `AGENT_LOG.md` were deleted; `CLAUDE.md` is the one instruction file, without its plan-approval rule | The two instruction files were identical, and the rule conflicted with how the sessions were actually run |
+| The template's second instruction file and its agent-log outline were deleted; `CLAUDE.md` is the one instruction file, without its plan-approval rule | The two instruction files were identical, and the rule conflicted with how the sessions were actually run |
 | A README draft said the bathrooms rule removes the 60-bathroom home | Code checked the row in session 3: it also lists 30 bedrooms, so the bedrooms rule, which runs first, removes it |
 | A DECISIONS.md draft called Champaign's band (66% to 142%) the widest | Code checked the band widths: Athens (73% to 153%) is wider |
 | Session 2's notes gave the pooled 90th-percentile error as +0.3619 | Session 3 printed it in full: 0.36196, which rounds to +0.3620. The page shows 136% either way |
